@@ -50,7 +50,7 @@ function Update-CordovaPlugin($sourceBase, $sourceReleativePath, $pluginBase, $p
 
         $pluginPath = Join-Path $pluginBase "plugin.xml"
         $xml = [xml](Get-Content $pluginPath)
-        $sourceNode = $xml.CreateElement("source-file")
+        $sourceNode = $xml.CreateElement("source-file", $xml.DocumentElement.NamespaceURI)
         $sourceNode.SetAttribute("src",  (Join-Path $pluginRelativePath $_.Key).Replace('\','/'))
         $sourceNode.SetAttribute("target-dir", $sourceReleativePath.Replace('\','/'))
         $xml.plugin.platform.AppendChild($sourceNode)
