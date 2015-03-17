@@ -29,6 +29,28 @@ function Get-CordovaPluginDifferentFiles($fileHash1, $fileHash2)
     $resultHash;
 }
 
+function Open-CordovaPlugin-Xml($pluginPath)
+{
+    [xml](Get-Content $pluginPath)
+}
+
+function Add-CordovaPlugin-SourceToXml($pluginPath, $srcAttribute, $targetAttribute)
+{
+        $xml =  Open-CordovaPlugin-Xml $pluginPath
+        
+        $sourceNode = $xml.CreateElement("source-file", $xml.DocumentElement.NamespaceURI)
+        $sourceNode.SetAttribute("src",  $srcAttribute)
+        $sourceNode.SetAttribute("target-dir", $targetAttribute)
+        $xml.plugin.platform.AppendChild($sourceNode)        
+        
+        Close-CordovaPlugin-Xml $pluginPath $xml
+}
+
+function Close-CordovaPlugin-Xml($pluginPath, $xml)
+{
+    $xml.Save($pluginPath)
+}
+
 function Update-CordovaPlugin($sourceBase, $sourceReleativePath, $pluginBase, $pluginRelativePath, $fileType)
 {
     $sourceHash = Get-CordovaPluginFileHash $sourceBase $sourceReleativePath $fileType
@@ -49,13 +71,10 @@ function Update-CordovaPlugin($sourceBase, $sourceReleativePath, $pluginBase, $p
         copy-item -force ($from) ($to) 
 
         $pluginPath = Join-Path $pluginBase "plugin.xml"
-        $xml = [xml](Get-Content $pluginPath)
-        $sourceNode = $xml.CreateElement("source-file", $xml.DocumentElement.NamespaceURI)
-        $sourceNode.SetAttribute("src",  (Join-Path $pluginRelativePath $_.Key).Replace('\','/'))
-        $sourceNode.SetAttribute("target-dir", $sourceReleativePath.Replace('\','/'))
-        $xml.plugin.platform.AppendChild($sourceNode)
-
-        $xml.Save($pluginPath)
+        $srcAttribute = (Join-Path $pluginRelativePath $_.Key).Replace('\','/')
+        $targetAttribute = $sourceReleativePath.Replace('\','/')
+        
+        Add-CordovaPlugin-SourceToXml $pluginPath $srcAttribute $targetAttribute        
     }
 
     Write-Host "------------------------------------------------------------"
@@ -84,7 +103,10 @@ if (test-path $workspace)
 
 # Copy from Original to Workspace
 copy-item -Recurse $original $workspace
-Update-CordovaPlugin "C:\tmp\ps-workspace\foldersync\workspace\source" "src\com\red_folder\phonegap\plugin\backgroundservice" "C:\tmp\ps-workspace\foldersync\workspace\destination" "src\android" "*.java"
+
+$sourceBase = "C:\tmp\ps-workspace\foldersync\workspace\source"
+$pluginBase = "C:\tmp\ps-workspace\foldersync\workspace\destination"
+Update-CordovaPlugin $sourceBase "src\com\red_folder\phonegap\plugin\backgroundservice" $pluginBase "src\android" "*.java"
 
 
 ######-------------------------------------------
