@@ -3,7 +3,6 @@
 function Get-CordovaPluginFileHash($baseFolder, $relativePath, $filter)
 {
     $fileHash = @{}
-    #Get-ChildItem -Recurse -Path (Join-Path $baseFolder $relativePath) -filter $filter | ForEach-Object { $fileHash.Add($_.Directory.ToString().Replace($baseFolder,"") + "\" + $_.Name, $_) }
     Get-ChildItem -Recurse -Path (Join-Path $baseFolder $relativePath) -filter $filter | ForEach-Object { $fileHash.Add($_.Name, $_) }
     $fileHash
 }
@@ -46,6 +45,18 @@ function Add-CordovaPlugin-SourceToXml($pluginPath, $srcAttribute, $targetAttrib
         Close-CordovaPlugin-Xml $pluginPath $xml
 }
 
+function Add-CordovaPlugin-ModuleToXml($pluginPath, $srcAttribute, $moduleName)
+{
+        $xml =  Open-CordovaPlugin-Xml $pluginPath
+        
+        $moduleNode = $xml.CreateElement("js-module", $xml.DocumentElement.NamespaceURI)
+        $moduleNode.SetAttribute("src",  $srcAttribute)
+        $moduleNode.SetAttribute("name", $moduleName)
+        $xml.plugin.platform.AppendChild($moduleNode) | Out-Null        
+        
+        Close-CordovaPlugin-Xml $pluginPath $xml
+}
+
 function Remove-CordovaPlugin-SourceToXml($pluginPath, $srcAttribute)
 {
         $xml =  Open-CordovaPlugin-Xml $pluginPath
@@ -72,8 +83,12 @@ function Close-CordovaPlugin-Xml($pluginPath, $xml)
     $xml.Save($pluginPath)
 }
 
-function Update-CordovaPlugin($sourceBase, $sourceReleativePath, $pluginBase, $pluginRelativePath, $fileType)
+function Update-CordovaPlugin($sourceBase, $sourceReleativePath, $pluginBase, $pluginRelativePath, $fileType, $jsmodule)
 {
+    Write-Host "------------------------------------------------------------"
+    Write-Host "Sync'ing" (Join-Path $sourceReleativePath $fileType)
+    Write-Host "------------------------------------------------------------"
+
     $sourceHash = Get-CordovaPluginFileHash $sourceBase $sourceReleativePath $fileType
 
     $pluginHash = Get-CordovaPluginFileHash $pluginBase $pluginRelativePath $fileType
@@ -82,9 +97,9 @@ function Update-CordovaPlugin($sourceBase, $sourceReleativePath, $pluginBase, $p
     $toBeDeletedHash = $pluginHash.GetEnumerator() | Where-Object { $sourceHash.ContainsKey($_.Key) -eq $false}
     $toBeCopiedHash = (Get-CordovaPluginDifferentFiles $sourceHash $pluginHash).GetEnumerator()
 
-    Write-Host "------------------------------------------------------------"
-    Write-Host "To be Added"
-    Write-Host "------------------------------------------------------------"
+    #Write-Host "------------------------------------------------------------"
+    #Write-Host "To be Added"
+    #Write-Host "------------------------------------------------------------"
     $toBeAddedHash | ForEach-Object { 
         $from = join-path (Join-Path $sourceBase $sourceReleativePath) $_.Key
         $to = Join-Path (Join-Path $pluginBase $pluginRelativePath) $_.Key
@@ -95,12 +110,17 @@ function Update-CordovaPlugin($sourceBase, $sourceReleativePath, $pluginBase, $p
         $srcAttribute = (Join-Path $pluginRelativePath $_.Key).Replace('\','/')
         $targetAttribute = $sourceReleativePath.Replace('\','/')
         
-        Add-CordovaPlugin-SourceToXml $pluginPath $srcAttribute $targetAttribute        
+        if ($jsmodule -ne $null)
+        {
+            Add-CordovaPlugin-ModuleToXml $pluginPath $srcAttribute $jsmodule
+        } else {
+            Add-CordovaPlugin-SourceToXml $pluginPath $srcAttribute $targetAttribute        
+        }
     }
 
-    Write-Host "------------------------------------------------------------"
-    Write-Host "To be Deleted"
-    Write-Host "------------------------------------------------------------"
+    #Write-Host "------------------------------------------------------------"
+    #Write-Host "To be Deleted"
+    #Write-Host "------------------------------------------------------------"
     $toBeDeletedHash | ForEach-Object { 
         $toBeDeleted = Join-Path (Join-Path $pluginBase $pluginRelativePath) $_.Key
         write-host "Removing $toBeDeleted"
@@ -112,9 +132,9 @@ function Update-CordovaPlugin($sourceBase, $sourceReleativePath, $pluginBase, $p
         Remove-CordovaPlugin-SourceToXml $pluginPath $srcAttribute
     }
 
-    Write-Host "------------------------------------------------------------"
-    Write-Host "To be Copied"
-    Write-Host "------------------------------------------------------------"
+    #Write-Host "------------------------------------------------------------"
+    #Write-Host "To be Copied"
+    #Write-Host "------------------------------------------------------------"
     $toBeCopiedHash | ForEach-Object { 
         $from = join-path (Join-Path $sourceBase $sourceReleativePath) $_.Key
         $to = Join-Path (Join-Path $pluginBase $pluginRelativePath) $_.Key
@@ -123,191 +143,30 @@ function Update-CordovaPlugin($sourceBase, $sourceReleativePath, $pluginBase, $p
     }
 }
 
-# Clear screen
-clear-host
-
-
-# Delete the workspace folder
-$original = "C:\tmp\ps-workspace\foldersync\original"
-$workspace = "C:\tmp\ps-workspace\foldersync\workspace"
-if (test-path $workspace)
+function Update-CordovaPlugin-InternalTest
 {
-    Write-Host "Deleting existing workspace"
-    Remove-Item -Recurse -Force C:\tmp\ps-workspace\foldersync\workspace
-}
-
-# Copy from Original to Workspace
-copy-item -Recurse $original $workspace
-
-$sourceBase = "C:\tmp\ps-workspace\foldersync\workspace\source"
-$pluginBase = "C:\tmp\ps-workspace\foldersync\workspace\destination"
-Update-CordovaPlugin $sourceBase "src\com\red_folder\phonegap\plugin\backgroundservice" $pluginBase "src\android" "*.java"
+    # Clear screen
+    clear-host
 
 
-######-------------------------------------------
-<#
-$sourceHash.GetEnumerator() | Where-Object { $destinationHash.ContainsKey($_.Key) -and {Compare-Object $(Get-Content $_.Value.Directory + "\" + $_.Name) $(Get-Content $destinationHash.Item($_.Key).Directory + "\" + $destinationHash.Item($_.Key).Name) -eq $null }}
-
-$sourceHash.GetEnumerator() | Where-Object { $destinationHash.ContainsKey($_.Key) } | Compare-Object $(Get-Content -path {$_.Value.Directory.ToString() + "\" + $_.Value.Name}) $(Get-Content -path {$destinationHash.Item($_.Key).Directory.ToString() + "\" + $destinationHash.Item($_.Key).Name})
-
-
-
-$sourceHash.GetEnumerator() | Where-Object { $destinationHash.ContainsKey($_.Key) } | Get-CordovaPluginFileDifferences $_.Value.Directory.ToString() + "\" + $_.Value.Name $destinationHash.Item($_.Key).Directory.ToString() + "\" + $destinationHash.Item($_.Key).Name
-
-
-
-$sourceHash.GetEnumerator() | Where-Object { $destinationHash.ContainsKey($_.Key) } | Get-CordovaPluginFileDifferences "$_.Value.Directory.ToString()\$_.Value.Name" "$destinationHash.Item($_.Key).Directory.ToString()\$destinationHash.Item($_.Key).Name"
-
-
-$sourceHash.GetEnumerator() | Where-Object { $destinationHash.ContainsKey($_.Key) } | Get-CordovaPluginFileDifferences (Join-Path $_.Value.Directory $_.Value.Name) (Join-Path $destinationHash.Item($_.Key).Directory $destinationHash.Item($_.Key).Name)
-
-
-$sourceHash.GetEnumerator() | Where-Object { $destinationHash.ContainsKey($_.Key) } | Get-CordovaPluginFileDifferences $_.Value $_.Value #$destinationHash.Item($_.Key)
-#>
-
-
-######-------------------------------------------
-
-<#
-function Get-CordovaPluginDifferentFiles($fileInfo1, $fileInfo2)
-{
-    $results = @()
-
-    foreach ($file in $fileInfo1.GetEnumerator)
+    # Delete the workspace folder
+    $original = "C:\tmp\ps-workspace\foldersync\original"
+    $workspace = "C:\tmp\ps-workspace\foldersync\workspace"
+    if (test-path $workspace)
     {
-        if ($fileInfo2.ContainsKey($file.Key))
-        {
-            $results += $file;
-        }
+        Write-Host "Deleting existing workspace"
+        Remove-Item -Recurse -Force C:\tmp\ps-workspace\foldersync\workspace
     }
 
-    return $results;
+    # Copy from Original to Workspace
+    copy-item -Recurse $original $workspace
+
+    $sourceBase = "C:\tmp\ps-workspace\foldersync\workspace\source"
+    $pluginBase = "C:\tmp\ps-workspace\foldersync\workspace\destination"
+    Update-CordovaPlugin $sourceBase "src\com\red_folder\phonegap\plugin\backgroundservice" $pluginBase "src\android" "*.java"
+    Update-CordovaPlugin $sourceBase "src\com\red_folder\phonegap\plugin\backgroundservice" $pluginBase "aidl\android" "*.aidl"
+    Update-CordovaPlugin $sourceBase "www" $pluginBase "www" "backgroundService.js" -jsmodule "BackgroundService"
+    Update-CordovaPlugin $sourceBase "www" $pluginBase "www" "add.js" -jsmodule "BackgroundService"
 }
 
-$sourceHash.GetEnumerator() | Where-Object { $destinationHash.ContainsKey($_.Key) } | Get-CordovaPluginDifferentFiles $_Value {$destinationHash.Item($_.Key)}
-#>
-
-<#
-function Get-CordovaPluginFileDifferences($file1, $file2)
-{
-Write-Host ($file1 | Format-List | Out-String)
-Write-Host ({$file2} | Format-List | Out-String)
-    $filename1 = Join-Path $file1.Directory $file1.Name
-    $filename2 = Join-Path $file2.Directory $file2.Name
-
-    Compare-Object $(Get-Content -path $filename1) $(Get-Content -path $filename2)
-}
-#>
-
-######-------------------------------------------
-
-
-#$sourceHash.GetEnumerator() | Where-Object { $destinationHash.ContainsKey($_.Key) } | 
-
-######-------------------------------------------
-
-# Get-ChildItem -Recurse -Path "source" -filter "*.java" | select-object "Name", "Directory", @{Name="RelativePath"; expression={$_.Directory.ToString().Replace($PWD.ToString(),"") + "\" + $_.Name}}
-
-#
-#$sourceFolder = Get-ChildItem -Recurse -Path "source" -filter "*.java"
-#$sourceFolder
-#
-#$destinationFolder = Get-ChildItem -Recurse -Path "destination" -filter "*.java"
-#$destinationFolder
-#
-#function Is-In
-#{
-#    [CmdletBinding()]
-#    param (
-#        [Parameter(Mandatory=$true,
-#                   ValueFromPipeline=$true,
-#                   Position=0)]
-#        $file, 
-#        [Parameter(Mandatory=$true,
-#                   ValueFromPipeline=$true,
-#                   Position=0)]
-#        $fileList 
-#    )
-#
-#    process {
-#        return $file.Name
-#    }
-#}
-
-#$sourceFolder | Is-In
-
-
-######-------------------------------------------
-
-
-<#
-$sourceHash.GetEnumerator() | Where-Object { $destinationHash.ContainsKey($_.Key) } | Join-Path -path $_ -childpath $_.Value.Name
-
-$sourceHash.GetEnumerator() | Join-Path -path {$_.Value.Description} -childpath $_.Value.Name
-
-$sourceHash.GetEnumerator() | Write-Host ({$_.Value} | Format-List | Out-String)
-
-
-$sourceHash.GetEnumerator() | Where-Object { $destinationHash.ContainsKey($_.Key) } | {Compare-Object $($_) $($_)
-
-$sourceHash.GetEnumerator() | Where-Object { $destinationHash.ContainsKey($_.Key) } 
-
-
-$tmp = $sourceHash.GetEnumerator() | Where-Object { $destinationHash.ContainsKey($_.Key) } #| select-object @{Name="Fullname"; Value={$_.Value}}
-
-$tmp.GetEnumerator() | Get-Content -path {$_.Value.Directory.ToString() + "\" + $_.Value.Name}
-
-
-$tmp.GetEnumerator() | select-object Value | Get-Member
-
-$sourceHash.GetEnumerator() | Where-Object { $destinationHash.ContainsKey($_.Key) } | Write-Host $_.Value
-
-foreach ($i in $sourceHash.GetEnumerator())
-{
-    Write-Host $i.Value.Directory
-    Write-Host $i.Value.Name
-    #Write-Host ($i.Value | Format-List | Out-String)
-}
-
-get-content "Something"
-
-
-
-#$sourceList = Get-ChildItem -Recurse -Path $sourceFolder -filter "*.java" | add-member -MemberType ScriptProperty -Name RelativePath –Value {$this.Directory.ToString().Replace($sourceFolder,"") + "\" + $this.Name} -PassThru
-#$sourceList
-$sourceHash = @{}
-Get-ChildItem -Recurse -Path $sourceFolder -filter "*.java" | ForEach-Object { $sourceHash.Add($_.Directory.ToString().Replace($sourceFolder,"") + "\" + $_.Name, $_) }
-$sourceHash
-
-$destinationFolder = $PWD.ToString() + "\destination"
-$destinationList = Get-ChildItem -Recurse -Path $destinationFolder -filter "*.java" | add-member -MemberType ScriptProperty -Name RelativePath –Value {$this.Directory.ToString().Replace($destinationFolder,"") + "\" + $this.Name} -PassThru
-$destinationList
-
-
-$x = $destinationList | ForEach-Object { $_.RelativePath}
-
-$x
-
-$sourceList | Where-Object { @{Files= $destinationList | ForEach-Object { $_.RelativePath }} -contains $_.RelativePath }
-
-$sourceList | Where-Object { $true}
-
-
-
-$sourceList | where-object { $_.RelativePath.Contains("NewFile")} 
-
-
-Write-Host $sourceList
-
-
-
-
-Get-ChildItem -Recurse -Path $sourceFolder -filter "*.java" | add-member -NotePropertyName Test –NotePropertyValue {{$_.Directory.ToString().Replace($sourceFolder,"") + "\" + $_.Name}} -PassThru | Select-Object Test
-
-Get-ChildItem -Recurse -Path $sourceFolder -filter "*.java" | add-member -MemberType ScriptProperty -Name Test –Value {$this.Directory.ToString().Replace($sourceFolder,"") + "\" + $this.Name} -PassThru | Select-Object Test
-
-@{Test={"a"+1}}
-
-
-#>
-
+#Update-CordovaPlugin-InternalTest
