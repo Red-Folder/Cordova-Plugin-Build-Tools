@@ -41,8 +41,29 @@ function Add-CordovaPlugin-SourceToXml($pluginPath, $srcAttribute, $targetAttrib
         $sourceNode = $xml.CreateElement("source-file", $xml.DocumentElement.NamespaceURI)
         $sourceNode.SetAttribute("src",  $srcAttribute)
         $sourceNode.SetAttribute("target-dir", $targetAttribute)
-        $xml.plugin.platform.AppendChild($sourceNode)        
+        $xml.plugin.platform.AppendChild($sourceNode) | Out-Null        
         
+        Close-CordovaPlugin-Xml $pluginPath $xml
+}
+
+function Remove-CordovaPlugin-SourceToXml($pluginPath, $srcAttribute)
+{
+        $xml =  Open-CordovaPlugin-Xml $pluginPath
+        
+        $sourceNode = $xml.plugin.platform.'source-file' | where-object { $_.src -eq $srcAttribute }
+        if ($sourceNode -ne $null)
+        {
+            $result = $xml.plugin.platform.RemoveChild($sourceNode)
+            if ($result -ne $null)
+            {
+                write-host "Node deleted"
+            } else {
+                write-host "Node failed to delete"
+            }
+        } else {
+            write-host "Node not found"
+        }
+
         Close-CordovaPlugin-Xml $pluginPath $xml
 }
 
@@ -59,7 +80,7 @@ function Update-CordovaPlugin($sourceBase, $sourceReleativePath, $pluginBase, $p
 
     $toBeAddedHash = $sourceHash.GetEnumerator() | Where-Object { $pluginHash.ContainsKey($_.Key) -eq $false}
     $toBeDeletedHash = $pluginHash.GetEnumerator() | Where-Object { $sourceHash.ContainsKey($_.Key) -eq $false}
-    $toBeCopiedHash = Get-CordovaPluginDifferentFiles $sourceHash $pluginHash
+    $toBeCopiedHash = (Get-CordovaPluginDifferentFiles $sourceHash $pluginHash).GetEnumerator()
 
     Write-Host "------------------------------------------------------------"
     Write-Host "To be Added"
@@ -80,12 +101,26 @@ function Update-CordovaPlugin($sourceBase, $sourceReleativePath, $pluginBase, $p
     Write-Host "------------------------------------------------------------"
     Write-Host "To be Deleted"
     Write-Host "------------------------------------------------------------"
-    $toBeDeletedHash
+    $toBeDeletedHash | ForEach-Object { 
+        $toBeDeleted = Join-Path (Join-Path $pluginBase $pluginRelativePath) $_.Key
+        write-host "Removing $toBeDeleted"
+        remove-item $toBeDeleted
+
+        $pluginPath = Join-Path $pluginBase "plugin.xml"
+        $srcAttribute = (Join-Path $pluginRelativePath $_.Key).Replace('\','/')
+        
+        Remove-CordovaPlugin-SourceToXml $pluginPath $srcAttribute
+    }
 
     Write-Host "------------------------------------------------------------"
     Write-Host "To be Copied"
     Write-Host "------------------------------------------------------------"
-    $toBeCopiedHash
+    $toBeCopiedHash | ForEach-Object { 
+        $from = join-path (Join-Path $sourceBase $sourceReleativePath) $_.Key
+        $to = Join-Path (Join-Path $pluginBase $pluginRelativePath) $_.Key
+        write-host "Copying $from to $to"
+        copy-item -force ($from) ($to) 
+    }
 }
 
 # Clear screen
