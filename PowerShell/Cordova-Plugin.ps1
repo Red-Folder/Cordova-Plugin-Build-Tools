@@ -170,3 +170,6 @@ function Update-CordovaPlugin-InternalTest
 }
 
 #Update-CordovaPlugin-InternalTest
+
+# Sample usage
+#(new-object Net.WebClient).DownloadString("https://raw.githubusercontent.com/Red-Folder/Cordova-Plugin-Build-Tools/master/PowerShell/Cordova-Plugin.ps1") | iex
