@@ -78,6 +78,27 @@ function Remove-CordovaPlugin-SourceToXml($pluginPath, $srcAttribute)
         Close-CordovaPlugin-Xml $pluginPath $xml
 }
 
+function Update-CordovaPlugin-ContentForConfigXml($xmlPath, $srcAttribute)
+{
+        $xml =  Open-CordovaPlugin-Xml $xmlPath
+        
+        $node = $xml.widget.content
+        if ($node -ne $null)
+        {
+            $result = $node.SetAttribute("src", $srcAttribute);
+            if ($result -ne $null)
+            {
+                write-host "Node amended"
+            } else {
+                write-host "Node failed to amend"
+            }
+        } else {
+            write-host "Node not found"
+        }
+
+        Close-CordovaPlugin-Xml $xmlPath $xml
+}
+
 function Close-CordovaPlugin-Xml($pluginPath, $xml)
 {
     $xml.Save($pluginPath)
