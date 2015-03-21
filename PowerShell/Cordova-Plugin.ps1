@@ -111,6 +111,27 @@ function Remove-CordovaPlugin-SourceToXml($pluginPath, $srcAttribute)
         Close-CordovaPlugin-Xml $pluginPath $xml
 }
 
+function Remove-CordovaPlugin-ModuleToXml($pluginPath, $srcAttribute)
+{
+        $xml =  Open-CordovaPlugin-Xml $pluginPath
+        
+        $node = $xml.plugin.platform.'js-module' | where-object { $_.src -eq $srcAttribute }
+        if ($node -ne $null)
+        {
+            $result = $xml.plugin.platform.RemoveChild($node)
+            if ($result -ne $null)
+            {
+                write-host "Node deleted"
+            } else {
+                write-host "Node failed to delete"
+            }
+        } else {
+            write-host "Node not found"
+        }
+
+        Close-CordovaPlugin-Xml $pluginPath $xml
+}
+
 function Update-CordovaPlugin-ContentForConfigXml($xmlPath, $srcAttribute)
 {
         $xml =  Open-CordovaPlugin-Xml $xmlPath
@@ -119,12 +140,7 @@ function Update-CordovaPlugin-ContentForConfigXml($xmlPath, $srcAttribute)
         if ($node -ne $null)
         {
             $result = $node.SetAttribute("src", $srcAttribute);
-            if ($result -ne $null)
-            {
-                write-host "Node amended"
-            } else {
-                write-host "Node failed to amend"
-            }
+            write-host "Node amended"
         } else {
             write-host "Node not found"
         }
@@ -140,12 +156,7 @@ function Update-CordovaPlugin-DependencyForXml($xmlPath, $idAttribute, $urlAttri
         if ($node -ne $null)
         {
             $result = $node.SetAttribute("url", $urlAttribute)
-            if ($result -ne $null)
-            {
-                write-host "Node amended"
-            } else {
-                write-host "Node failed to amend"
-            }
+            write-host "Node amended"
         } else {
             write-host "Node not found"
         }
@@ -173,7 +184,7 @@ function Revert-CordovaPlugin($pluginBase)
     Pop-Location
 }
 
-function Update-CordovaPlugin($sourceBase, $sourceReleativePath, $pluginBase, $pluginRelativePath, $fileType, $jsmodule)
+function Update-CordovaPlugin-Source($sourceBase, $sourceReleativePath, $pluginBase, $pluginRelativePath, $fileType, $jsmodule, [switch]$isModule, [switch]$isAsset, [switch]$isSource)
 {
     Write-Host "------------------------------------------------------------"
     Write-Host "Sync'ing" (Join-Path $sourceReleativePath $fileType)
@@ -187,6 +198,8 @@ function Update-CordovaPlugin($sourceBase, $sourceReleativePath, $pluginBase, $p
     $toBeDeletedHash = $pluginHash.GetEnumerator() | Where-Object { $sourceHash.ContainsKey($_.Key) -eq $false}
     $toBeCopiedHash = (Get-CordovaPluginDifferentFiles $sourceHash $pluginHash).GetEnumerator()
 
+    $pluginPath = Join-Path $pluginBase "plugin.xml"
+ 
     #Write-Host "------------------------------------------------------------"
     #Write-Host "To be Added"
     #Write-Host "------------------------------------------------------------"
@@ -196,15 +209,24 @@ function Update-CordovaPlugin($sourceBase, $sourceReleativePath, $pluginBase, $p
         write-host "Copying $from to $to"
         copy-item -force ($from) ($to) 
 
-        $pluginPath = Join-Path $pluginBase "plugin.xml"
         $srcAttribute = (Join-Path $pluginRelativePath $_.Key).Replace('\','/')
         $targetAttribute = $sourceReleativePath.Replace('\','/')
-        
-        if ($jsmodule -ne $null)
-        {
-            Add-CordovaPlugin-ModuleToXml $pluginPath $srcAttribute $jsmodule
+
+        if ($isModule.IsPresent)
+        {        
+            if ($jsmodule -ne $null)
+            {
+                Add-CordovaPlugin-ModuleToXml $pluginPath $srcAttribute $jsmodule
+            } else {
+                Write-Host "Error: Missing module name - $srcAttribute"
+            }
         } else {
-            Add-CordovaPlugin-SourceToXml $pluginPath $srcAttribute $targetAttribute        
+            if ($isAsset.IsPresent)
+            {
+                Add-CordovaPlugin-AssetToXml $pluginPath $srcAttribute $targetAttribute        
+            } else {
+                Add-CordovaPlugin-SourceToXml $pluginPath $srcAttribute $targetAttribute        
+            }
         }
     }
 
@@ -216,10 +238,19 @@ function Update-CordovaPlugin($sourceBase, $sourceReleativePath, $pluginBase, $p
         write-host "Removing $toBeDeleted"
         remove-item $toBeDeleted
 
-        $pluginPath = Join-Path $pluginBase "plugin.xml"
         $srcAttribute = (Join-Path $pluginRelativePath $_.Key).Replace('\','/')
         
-        Remove-CordovaPlugin-SourceToXml $pluginPath $srcAttribute
+        if ($isModule.IsPresent)
+        {
+            Remove-CordovaPlugin-ModuleToXml $pluginPath $srcAttribute
+        } else {
+            if ($isAsset.IsPresent)
+            {
+                Remove-CordovaPlugin-AssetToXml $pluginPath $srcAttribute
+            } else {
+                Remove-CordovaPlugin-SourceToXml $pluginPath $srcAttribute
+            }
+        }
     }
 
     #Write-Host "------------------------------------------------------------"
@@ -257,6 +288,8 @@ function Update-CordovaPlugin-InternalTest
     Update-CordovaPlugin $sourceBase "src\com\red_folder\phonegap\plugin\backgroundservice" $pluginBase "aidl\android" "*.aidl"
     Update-CordovaPlugin $sourceBase "www" $pluginBase "www" "backgroundService.js" -jsmodule "BackgroundService"
     Update-CordovaPlugin $sourceBase "www" $pluginBase "www" "add.js" -jsmodule "BackgroundService"
+
+    Update-CordovaPlugin-DependencyForXml (Join-Path $pluginBase "plugin.xml") "com.red_folder.phonegap.plugin.backgroundservice" "Test"
 }
 
 #Update-CordovaPlugin-InternalTest
