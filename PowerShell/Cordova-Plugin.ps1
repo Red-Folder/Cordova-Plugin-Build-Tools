@@ -33,14 +33,26 @@ function Open-CordovaPlugin-Xml($pluginPath)
     [xml](Get-Content $pluginPath)
 }
 
+function Add-CordovaPlugin-AssetToXml($pluginPath, $srcAttribute, $targetAttribute)
+{
+        $xml =  Open-CordovaPlugin-Xml $pluginPath
+        
+        $node = $xml.CreateElement("asset", $xml.DocumentElement.NamespaceURI)
+        $node.SetAttribute("src",  $srcAttribute)
+        $node.SetAttribute("target", $targetAttribute)
+        $xml.plugin.platform.AppendChild($node) | Out-Null        
+        
+        Close-CordovaPlugin-Xml $pluginPath $xml
+}
+
 function Add-CordovaPlugin-SourceToXml($pluginPath, $srcAttribute, $targetAttribute)
 {
         $xml =  Open-CordovaPlugin-Xml $pluginPath
         
-        $sourceNode = $xml.CreateElement("source-file", $xml.DocumentElement.NamespaceURI)
-        $sourceNode.SetAttribute("src",  $srcAttribute)
-        $sourceNode.SetAttribute("target-dir", $targetAttribute)
-        $xml.plugin.platform.AppendChild($sourceNode) | Out-Null        
+        $node = $xml.CreateElement("source-file", $xml.DocumentElement.NamespaceURI)
+        $node.SetAttribute("src",  $srcAttribute)
+        $node.SetAttribute("target-dir", $targetAttribute)
+        $xml.plugin.platform.AppendChild($node) | Out-Null        
         
         Close-CordovaPlugin-Xml $pluginPath $xml
 }
@@ -49,11 +61,32 @@ function Add-CordovaPlugin-ModuleToXml($pluginPath, $srcAttribute, $moduleName)
 {
         $xml =  Open-CordovaPlugin-Xml $pluginPath
         
-        $moduleNode = $xml.CreateElement("js-module", $xml.DocumentElement.NamespaceURI)
-        $moduleNode.SetAttribute("src",  $srcAttribute)
-        $moduleNode.SetAttribute("name", $moduleName)
-        $xml.plugin.platform.AppendChild($moduleNode) | Out-Null        
+        $node = $xml.CreateElement("js-module", $xml.DocumentElement.NamespaceURI)
+        $node.SetAttribute("src",  $srcAttribute)
+        $node.SetAttribute("name", $moduleName)
+        $xml.plugin.platform.AppendChild($node) | Out-Null        
         
+        Close-CordovaPlugin-Xml $pluginPath $xml
+}
+
+function Remove-CordovaPlugin-AssetToXml($pluginPath, $srcAttribute)
+{
+        $xml =  Open-CordovaPlugin-Xml $pluginPath
+        
+        $node = $xml.plugin.platform.asset | where-object { $_.src -eq $srcAttribute }
+        if ($node -ne $null)
+        {
+            $result = $xml.plugin.platform.RemoveChild($node)
+            if ($result -ne $null)
+            {
+                write-host "Node deleted"
+            } else {
+                write-host "Node failed to delete"
+            }
+        } else {
+            write-host "Node not found"
+        }
+
         Close-CordovaPlugin-Xml $pluginPath $xml
 }
 
@@ -61,10 +94,10 @@ function Remove-CordovaPlugin-SourceToXml($pluginPath, $srcAttribute)
 {
         $xml =  Open-CordovaPlugin-Xml $pluginPath
         
-        $sourceNode = $xml.plugin.platform.'source-file' | where-object { $_.src -eq $srcAttribute }
-        if ($sourceNode -ne $null)
+        $node = $xml.plugin.platform.'source-file' | where-object { $_.src -eq $srcAttribute }
+        if ($node -ne $null)
         {
-            $result = $xml.plugin.platform.RemoveChild($sourceNode)
+            $result = $xml.plugin.platform.RemoveChild($node)
             if ($result -ne $null)
             {
                 write-host "Node deleted"
@@ -99,9 +132,45 @@ function Update-CordovaPlugin-ContentForConfigXml($xmlPath, $srcAttribute)
         Close-CordovaPlugin-Xml $xmlPath $xml
 }
 
+function Update-CordovaPlugin-DependencyForXml($xmlPath, $idAttribute, $urlAttribute)
+{
+        $xml =  Open-CordovaPlugin-Xml $xmlPath
+
+        $node = $xml.plugin.dependency | where-object { $_.id -eq $idAttribute }
+        if ($node -ne $null)
+        {
+            $result = $node.SetAttribute("url", $urlAttribute)
+            if ($result -ne $null)
+            {
+                write-host "Node amended"
+            } else {
+                write-host "Node failed to amend"
+            }
+        } else {
+            write-host "Node not found"
+        }
+        
+        Close-CordovaPlugin-Xml $xmlPath $xml
+}
+
 function Close-CordovaPlugin-Xml($pluginPath, $xml)
 {
     $xml.Save($pluginPath)
+}
+
+function Commit-CordovaPlugin($pluginBase, $commitMessage)
+{
+    Push-Location $pluginBase
+    git add *
+    git commit -m $commitMessage
+    Pop-Location
+}
+
+function Revert-CordovaPlugin($pluginBase)
+{
+    Push-Location $pluginBase
+    git checkout *
+    Pop-Location
 }
 
 function Update-CordovaPlugin($sourceBase, $sourceReleativePath, $pluginBase, $pluginRelativePath, $fileType, $jsmodule)
