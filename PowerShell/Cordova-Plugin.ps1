@@ -207,7 +207,7 @@ function Update-CordovaPlugin-Source($sourceBase, $sourceReleativePath, $pluginB
         $from = join-path (Join-Path $sourceBase $sourceReleativePath) $_.Key
         $to = Join-Path (Join-Path $pluginBase $pluginRelativePath) $_.Key
         
-        if (!Test-Path (Join-Path $pluginBase $pluginRelativePath)) {
+        if (!(Test-Path (Join-Path $pluginBase $pluginRelativePath))) {
             New-Item -ItemType Directory -Path (Join-Path $pluginBase $pluginRelativePath) -Force
         }
         
