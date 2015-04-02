@@ -206,6 +206,11 @@ function Update-CordovaPlugin-Source($sourceBase, $sourceReleativePath, $pluginB
     $toBeAddedHash | ForEach-Object { 
         $from = join-path (Join-Path $sourceBase $sourceReleativePath) $_.Key
         $to = Join-Path (Join-Path $pluginBase $pluginRelativePath) $_.Key
+        
+        if (!Test-Path (Join-Path $pluginBase $pluginRelativePath)) {
+            New-Item -ItemType Directory -Path (Join-Path $pluginBase $pluginRelativePath) -Force
+        }
+        
         write-host "Copying $from to $to"
         copy-item -force ($from) ($to) 
 
