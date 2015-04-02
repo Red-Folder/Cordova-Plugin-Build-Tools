@@ -3,7 +3,10 @@
 function Get-CordovaPluginFileHash($baseFolder, $relativePath, $filter)
 {
     $fileHash = @{}
-    Get-ChildItem -Path (Join-Path $baseFolder $relativePath) -filter $filter | ForEach-Object { $fileHash.Add($_.Name, $_) }
+    
+    if (Test-Path (Join-Path $baseFolder $relativePath)) {
+        Get-ChildItem -Path (Join-Path $baseFolder $relativePath) -filter $filter | ForEach-Object { $fileHash.Add($_.Name, $_) }
+    }
     $fileHash
 }
 
