@@ -272,6 +272,17 @@ function Update-CordovaPlugin-Source($sourceBase, $sourceReleativePath, $pluginB
     }
 }
 
+function Get-LogcatErrors($path)
+{
+    $ignoreTags = "Zygote", "BatteryService", "logwrapper", "System", "SoundPool", "SurfaceFlinger", 
+                    "SensorService", "EventHub", "UsbObserver", "ThrottleService", "MetadataRetrieverClient"
+
+    get-content $path | 
+        where-object { $_.length -gt 0 } | 
+        where-object { $_.Substring(19,2) -eq "E/" } | 
+        where-object { ($ignoreTags -notcontains ($_.Substring(21, ($_.length -21)).Split('(')[0]).TrimEnd()) -eq $true }
+}
+
 function Update-CordovaPlugin-InternalTest
 {
     # Clear screen
