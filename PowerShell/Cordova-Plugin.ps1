@@ -149,6 +149,8 @@ function Update-CordovaPlugin-ContentForConfigXml($xmlPath, $srcAttribute)
         }
 
         Close-CordovaPlugin-Xml $xmlPath $xml
+        
+        exit 0;
 }
 
 function Update-CordovaPlugin-DependencyForXml($xmlPath, $idAttribute, $urlAttribute)
